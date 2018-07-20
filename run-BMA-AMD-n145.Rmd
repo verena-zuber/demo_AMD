@@ -1,0 +1,349 @@
+---
+title: "Multivariable Mendelian randomization: NMR data and AMD"
+author: "Verena Zuber"
+date: "18/7/2018"
+output: html_document
+---
+
+
+## Multivariable Mendelian randomization:  The impact of lipids fractions (NMR meta-analysis) on AMD.
+## http://www.computationalmedicine.fi/data#NMR_GWAS
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+source("mvMR_functions.R")
+source("summary_mvMR_SSS.R")
+source("summary_mvMR_BF.R")
+```
+
+
+
+
+## 1. Loading the data  and removing the outlier and influential points
+
+
+
+
+The outcome of interest is AMD, the respective summary data is stored in the vectors amd_beta and amd_se. 
+```{r message=FALSE, warning=FALSE}
+load("amd_example")
+amd_beta =  amd_example$amd_beta
+amd_se =  amd_example$amd_se
+hist(amd_beta)
+```
+
+The risk factor data is stored in the betaX matrix with n=148 genetic variants and 49 metabolites. Information on the 148 genetic variants (taken from the GLGC, independent variants associated with any lipid measurement (TG,LDL, or HDL)) is given in annotate, this gives genomic position, effect allele frequency and annotated gene by VEP.
+```{r message=FALSE, warning=FALSE}
+betaX =  amd_example$betaX
+dim(betaX)
+rf=colnames(betaX)
+rf
+annotate =  amd_example$annotate
+rs = annotate$rsid
+genes = annotate$nearest_gene
+```
+
+Next we remove the genetic variants which were indicated as either outliers (FUT2, APOE) or influential points (LIPC) in the analysis including all genetic instrumental variables available.
+
+```{r message=FALSE, warning=FALSE}
+LIPC = which(genes == "LIPC")
+FUT2 = which(genes == "FUT2")
+APOE = which(genes == "APOE")
+exclude_vec = c(LIPC,FUT2,APOE)
+rs[exclude_vec]
+amd_beta = amd_beta[-exclude_vec]
+amd_se = amd_se[-exclude_vec]
+rs = rs[-exclude_vec]
+genes = genes[-exclude_vec]
+betaX = betaX[-exclude_vec, ]
+```
+
+
+
+We perform an inverse variance weighting (IVW) based on the standard error of the amd beta effect estimates.
+```{r message=FALSE, warning=FALSE}
+betaX_ivw = betaX / amd_se
+amd_beta_ivw = amd_beta / amd_se
+```
+
+
+
+## 2. Analysis: Univariable MR
+
+
+Univariate MR for each metabolite, ranked by minimum p-value.
+```{r message=FALSE, warning=FALSE}
+beta_coeff = rep(0, ncol(betaX_ivw)) 
+p_val = rep(0, ncol(betaX_ivw)) 
+for(i in 1:ncol(betaX_ivw)){
+	lm_out = lm(amd_beta_ivw ~ betaX_ivw[,i]-1)
+	beta_coeff[i] =summary(lm_out)$coeff[1]
+	p_adjust =summary(lm_out)$coeff[4]*49
+	if(p_adjust>1){p_val[i] = 1}
+	else{p_val[i] = p_adjust}
+} 
+mat_out = cbind(colnames(betaX_ivw),beta_coeff, p_val) 
+sort_p=sort(p_val, index.return=TRUE, decreasing = FALSE)
+colnames(mat_out) = c("rf","beta with AMD","p")
+mat_out[sort_p$ix,]
+```
+
+
+
+
+## 3. Analysis: Bayesian model selection with stochastic search
+
+
+
+We create an object of class mvMRInput and we run MR-BMA allowing for models with up to 12 risk factors and a prior probability of 0.1 reflecting an a priori model size of 5 risk factors.
+
+```{r message=FALSE, warning=FALSE}
+amd_nmr_input=new("mvMRInput", betaX = as.matrix(betaX_ivw), betaY = as.matrix(amd_beta_ivw), snps=rs, exposure=rf, outcome = "amd")
+BMA_output=summarymvMR_SSS(amd_nmr_input,kmin=1,kmax=12, prior_prob=0.1, max_iter=100000)
+```
+
+
+
+The best model with the highest posterior evidence:
+```{r message=FALSE, warning=FALSE}
+best_model_ind=as.numeric(unlist(strsplit(BMA_output@BestModel, ",")))
+rf[best_model_ind]
+BMA_output@BestModel_Estimate
+```
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+pp=BMA_output@pp
+models=BMA_output@tupel
+sort_pp_model_object=sort.int(pp, index.return=TRUE, decreasing=TRUE)
+grep_rf=models[sort_pp_model_object$ix][1:10]
+rf_top10 = list()
+for(i in 1:10){rf_top10[i]=paste(rf[as.numeric(unlist(strsplit(grep_rf[i], ",")))],  collapse=",")}
+best_10models=cbind(rf_top10, pp[sort_pp_model_object$ix][1:10])
+colnames(best_10models) = c("rf combination", "posterior probability")
+#write.csv(best_10models, file="amd_best_10models_n145")
+```
+
+
+What are the next best individual models?
+```{r message=FALSE, warning=FALSE}
+best_10models
+```
+
+MR-BMA output: Marginal inclusion probabilities and average effect for each risk factor (top 10).
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+pp_marginal = BMA_output@pp_marginal
+bma=BMA_output@BMAve_Estimate
+sort_pp_object=sort.int(pp_marginal, index.return=TRUE, decreasing=TRUE)
+marginal_out=cbind(rf[sort_pp_object$ix][1:10], pp_marginal[sort_pp_object$ix][1:10], bma[sort_pp_object$ix][1:10] )
+colnames(marginal_out)=c("rf", "marginal inclusion", "average effect")
+#write.csv(marginal_out, file="amd_marginal_out_n145")
+```
+```{r message=FALSE, warning=FALSE}
+marginal_out
+```
+
+
+
+
+
+## 4. Model diagnostics for outliers (Cook's D) and influential points (Q) 
+
+
+
+ 
+These are the 4 top model.
+```{r message=FALSE, warning=FALSE}
+#
+model1_index = c(45)
+colnames(betaX_ivw)[model1_index]
+betaX_model1 = as.matrix(betaX_ivw[,model1_index])
+#
+model2_index = c(20)
+colnames(betaX_ivw)[model2_index]
+betaX_model2 = as.matrix(betaX_ivw[,model2_index])
+#
+model3_index = c(11,20)
+colnames(betaX_ivw)[model3_index]
+betaX_model3 = as.matrix(betaX_ivw[,model3_index])
+#
+model4_index = c(45,48)
+colnames(betaX_ivw)[model4_index]
+betaX_model4 = as.matrix(betaX_ivw[,model4_index])
+```
+
+
+
+Next we fit the Hat matrices for these models and predict the association with CHD (beta_chd), and compute Cook's distance and the Q-statistic.
+
+```{r message=FALSE, warning=FALSE}
+#
+sigma_vec = rep(0.5, ncol(betaX_model1))
+BF = 10^(logBF(amd_beta_ivw,betaX_model1,sigma_vec))
+BF
+theta = beta_est(amd_beta_ivw,betaX_model1,sigma_vec)
+theta
+cD1 = cooksD(amd_beta_ivw,betaX_model1,sigma_vec)
+H_fm1 = betaX_model1 %*% solve(t(betaX_model1) %*% betaX_model1 + sigma_vec^{-2} ) %*% t(betaX_model1)
+predicted_amd1 = H_fm1 %*% amd_beta_ivw
+Q1 = (amd_beta_ivw-predicted_amd1)^2
+#
+sigma_vec = rep(0.5, ncol(betaX_model2))
+BF = 10^(logBF(amd_beta_ivw,betaX_model2,sigma_vec))
+BF
+theta = beta_est(amd_beta_ivw,betaX_model2,sigma_vec)
+theta
+cD2 = cooksD(amd_beta_ivw,betaX_model2,sigma_vec)
+H_fm2 = betaX_model2 %*% solve(t(betaX_model2) %*% betaX_model2 + sigma_vec^{-2} ) %*% t(betaX_model2)
+predicted_amd2 = H_fm2 %*% amd_beta_ivw
+Q2 = (amd_beta_ivw-predicted_amd2)^2
+#
+sigma_vec = rep(0.5, ncol(betaX_model3))
+BF = 10^(logBF(amd_beta_ivw,betaX_model3,sigma_vec))
+BF
+theta = beta_est(amd_beta_ivw,betaX_model3,sigma_vec)
+theta
+cD3 = cooksD(amd_beta_ivw,betaX_model3,sigma_vec)
+H_fm3 = betaX_model3 %*% solve(t(betaX_model3) %*% betaX_model3 + sigma_vec^{-2} ) %*% t(betaX_model3)
+predicted_amd3 = H_fm3 %*% amd_beta_ivw
+Q3 = (amd_beta_ivw-predicted_amd3)^2
+#
+sigma_vec = rep(0.5, ncol(betaX_model4))
+BF = 10^(logBF(amd_beta_ivw,betaX_model4,sigma_vec))
+BF
+theta = beta_est(amd_beta_ivw,betaX_model4,sigma_vec)
+theta
+cD4 = cooksD(amd_beta_ivw,betaX_model4,sigma_vec)
+H_fm4 = betaX_model4 %*% solve(t(betaX_model4) %*% betaX_model4 + sigma_vec^{-2} ) %*% t(betaX_model4)
+predicted_amd4 = H_fm4 %*% amd_beta_ivw
+Q4 = (amd_beta_ivw-predicted_amd4)^2
+```
+
+
+
+## Influential points via Cook's D
+
+
+Diagnostic plots of predicted by the model versus the actually observed ones.
+Influential points (computed by Cooks distance) are marked by the regions the SNPs fall in.
+
+```{r, echo=FALSE, include = TRUE, fig.height = 10, fig.width = 11}
+title1=paste(colnames(betaX_ivw)[model1_index],collapse=' + ')
+title1
+df = data.frame(x=predicted_amd1, y =amd_beta_ivw, cD = cD1, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = cD), size =4) + scale_colour_gradientn(colours = c("white", "orange", "red", "darkred"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Cooks D") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(cD>0.03,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title1)
+
+title2=paste(colnames(betaX_ivw)[model2_index],collapse=' + ')
+title2
+df = data.frame(x=predicted_amd2, y =amd_beta_ivw, cD = cD2, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = cD), size =4) + scale_colour_gradientn(colours = c("white", "orange", "red", "darkred"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Cooks D") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(cD>0.03,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title2)
+
+title3=paste(colnames(betaX_ivw)[model3_index],collapse=' + ')
+title3
+df = data.frame(x=predicted_amd3, y =amd_beta_ivw, cD = cD3, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = cD), size =4) + scale_colour_gradientn(colours = c("white", "orange", "red", "darkred"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Cooks D") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(cD>0.03,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title3)
+
+title4=paste(colnames(betaX_ivw)[model4_index],collapse=' + ')
+title4
+df = data.frame(x=predicted_amd4, y =amd_beta_ivw, cD = cD4, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = cD), size =4) + scale_colour_gradientn(colours = c("white", "orange", "red", "darkred"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Cooks D") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(cD>0.03,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title4)
+
+```
+
+
+
+
+
+Table of Cooks Distance of the models, sorted by minimum Cooks Distance in any of the models conisdered.
+
+```{r message=FALSE, warning=FALSE}
+cooksD_model1=cbind(round(cD1,digits=3),round(cD2,digits=3),round(cD3,digits=3),round(cD4,digits=3))
+maxCD=apply(cooksD_model1, MARGIN=1, FUN=max)
+minCD=apply(cooksD_model1, MARGIN=1, FUN=min)
+sort.ix = sort.int(minCD, decreasing=TRUE, index.return=TRUE)
+cooksD_model1=cbind(rs,genes,cooksD_model1, minCD)
+colnames(cooksD_model1)=c("rs","region","cooksD1","cooksD2","cooksD3","cooksD4","min cooksD")
+cooksD_model1[sort.ix$ix,][1:10,]
+
+
+```
+
+
+
+
+## Outliers with Q
+
+Diagnostic plots of predicted by the model versus the actually observed ones.
+Outliers (computed by Q) are marked by the regions the SNPs fall in.
+
+```{r, echo=FALSE, include = TRUE, fig.height = 10, fig.width = 11}
+title1=paste(colnames(betaX_ivw)[model1_index],collapse=' + ')
+title1
+df = data.frame(x=predicted_amd1, y =amd_beta_ivw, Q = Q1, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = Q), size =4) + scale_colour_gradientn(colours = c("white", "yellow", "green", "darkgreen"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Q") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(Q>10,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title1)
+
+title2=paste(colnames(betaX_ivw)[model2_index],collapse=' + ')
+title2
+df = data.frame(x=predicted_amd2, y =amd_beta_ivw, Q = Q2, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = Q), size =4) + scale_colour_gradientn(colours = c("white", "yellow", "green", "darkgreen"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Q") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(Q>10,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title2)
+
+title3=paste(colnames(betaX_ivw)[model3_index],collapse=' + ')
+title3
+df = data.frame(x=predicted_amd3, y =amd_beta_ivw, Q = Q3, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = Q), size =4) + scale_colour_gradientn(colours = c("white", "yellow", "green", "darkgreen"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Q") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(Q>10,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title3)
+
+title4=paste(colnames(betaX_ivw)[model4_index],collapse=' + ')
+title4
+df = data.frame(x=predicted_amd4, y =amd_beta_ivw, Q = Q4, genes = genes)
+ggplot(df, aes(x, y)) +  geom_point(aes(colour = Q), size =4) + scale_colour_gradientn(colours = c("white", "yellow", "green", "darkgreen"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Q") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(Q>10,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title4)
+
+```
+
+
+
+
+Table of Q  of the models, sorted by minimum Cooks Distance in any of the models conisdered.
+
+```{r message=FALSE, warning=FALSE}
+Q_model2=cbind(round(Q1,digits=3),round(Q2,digits=3),round(Q3,digits=3), round(Q4,digits=3))
+maxQ=apply(Q_model2, MARGIN=1, FUN=max)
+minQ=apply(Q_model2, MARGIN=1, FUN=min)
+sort.ix = sort.int(minQ, decreasing=TRUE, index.return=TRUE)
+Q_model2=cbind(rs,genes,Q_model2, minQ)
+colnames(Q_model2)=c("rs","region","Q1","Q2","Q3","Q4", "min Q")
+Q_model2[sort.ix$ix,][1:10,]
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--
+require(knitr)
+require(markdown)
+knit("run-BMA-AMD-n145.Rmd")
+markdownToHTML('run-BMA-AMD-n145.md', 'run-BMA-AMD-n145.html', options=c("use_xhml"))
+-->
+
