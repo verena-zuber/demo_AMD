@@ -1,5 +1,4 @@
-# demo_AMD
-# 20th of July 2018
+# demo_AMD (20th of July 2018)
 
 Documentation of the multivariable MR analysis to prioritise NMR metabolites as risk factors for AMD using MR-BMA as detailed in Selecting causal risk factors from high-throughput experiments using multivariable Mendelian randomization by Verena Zuber, Johanna Maria Colijn, Caroline Klaver, and Stephen Burgess.
 
@@ -25,11 +24,13 @@ Compilation:
 1. all genetic instrumental variables included:
 
 knit("run-BMA-AMD-n148.Rmd")
+
 markdownToHTML('run-BMA-AMD-n148.md', 'run-BMA-AMD-n148.html', options=c("use_xhml"))
 
 2. after excluding outliers and influential points:
 
 knit("run-BMA-AMD-n145.Rmd")
+
 markdownToHTML('run-BMA-AMD-n145.md', 'run-BMA-AMD-n145.html', options=c("use_xhml"))
 
 
