@@ -20,12 +20,15 @@ Kettunen, J., Demirkan, A., Wuertz, P., Draisma, H. H. M., Haller, T., Rawal, R.
 
 
 Compilation:
+-------------
 
 1. all genetic instrumental variables included:
+
 knit("run-BMA-AMD-n148.Rmd")
 markdownToHTML('run-BMA-AMD-n148.md', 'run-BMA-AMD-n148.html', options=c("use_xhml"))
 
 2. after excluding outliers and influential points:
+
 knit("run-BMA-AMD-n145.Rmd")
 markdownToHTML('run-BMA-AMD-n145.md', 'run-BMA-AMD-n145.html', options=c("use_xhml"))
 
@@ -34,10 +37,16 @@ markdownToHTML('run-BMA-AMD-n145.md', 'run-BMA-AMD-n145.html', options=c("use_xh
 
 
 Package dependencies:
+---------------------
 
 require(knitr)
+
 require(markdown)
+
 require(ggplot2)
+
 require(combinat)
+
 require(hash)
+
 require(corpcor)
