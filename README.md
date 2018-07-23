@@ -2,7 +2,7 @@
 
 Documentation of the multivariable MR analysis to prioritise NMR metabolites as risk factors for AMD using MR-BMA as detailed in Selecting causal risk factors from high-throughput experiments using multivariable Mendelian randomization by Verena Zuber, Johanna Maria Colijn, Caroline Klaver, and Stephen Burgess.
 
-Example data is based on publicely available summary data on: 
+Example data (amd_example Rdata) is based on publicely available summary data on: 
 
 AMD
 ---
