@@ -7,7 +7,7 @@ output: html_document
 
 
 ## Multivariable Mendelian randomization:  The impact of lipids fractions (NMR meta-analysis) on AMD.
-## http://www.computationalmedicine.fi/data#NMR_GWAS
+
 
 
 
