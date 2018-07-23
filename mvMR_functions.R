@@ -7,10 +7,7 @@
 # sim.mvnorm: 		fast multivariate normal
 # generate_mv_input:	simulate synthetic input for simulation study
 # generate_mv_input2: 	based on real risk factor associations simulate outcome associations
-# computeR2: 		check proportion of variance explained
-# get_snp_info: 	query position of SNP from ENSEMBL
-# get_snp_MAF: 		query MAF of SNP from ENSEMBL
-# get_snp_phenotypes:	phenoscan ENSEMBL
+
 
 
 
@@ -208,73 +205,6 @@ computeR2 = function(theta,Sigma_beta, var_epsilon){
 #var_error = var_explained (1-R2)/R2
 
 # var explained = beta Sigma beta
-
-# one other option
-#Omega^2 = P P_xx^1 P multiple correlation coefficient
-# sigma_Y Omega2 = variance explained 
-# sigma_Y (1-Omega2) = unexplained variance
-#Here we have beta = cov xy / cov x
-#P = cov xy / sqrt(cov x cov y)
-#P = beta * sqrt(cov x)  / sqrt(cov y)
-
-
-
-
-
-
-
-1 = "/variation/human/"
-	ext3 = "?phenotypes=1"
-
-	i=1
-	ext2 = rs_vec[1]
-	r = GET(paste(server, ext1, ext2,ext3, sep = ""), content_type("application/json"))
-	res_out=fromJSON(toJSON(content(r)))
-
-	output = res_out$phenotypes
-
-	if (length(rs_list)>1){ 
-	for (i in 2:length(rs_list)){
-		ext2 = rs_vec[i]
-		r = GET(paste(server, ext1, ext2,ext3, sep = ""), content_type("application/json"))
-		res_out=fromJSON(toJSON(content(r)))
-		output=rbind(output,res_out$phenotypes)
-		}
-	}
-
-	return(output)
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#computeR2 = function(theta,Sigma_beta, var_epsilon){
-# 
-#	dc=decompose.cov(Sigma_beta)
-#	cR=chol(dc$r)
-#	sd_beta = sqrt(dc$v)
-#	var_explained = (theta*sd_beta) %*% mpower(dc$r, alpha=-1) %*%(theta*sd_beta)
-#	R2 = var_explained / (var_explained + var_epsilon)
-#	return(R2)
-# 
-#}
-
-
-
-
-
-
 
 
 
