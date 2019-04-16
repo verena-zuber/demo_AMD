@@ -1,8 +1,20 @@
-# demo_AMD (20th of July 2018)
+# Selecting causal risk factors from high-throughput experiments using multivariable Mendelian randomization
+# (20th of July 2018, updated 16th of April 2019)
 
-Documentation of the multivariable MR analysis to prioritise NMR metabolites as risk factors for AMD using MR-BMA as detailed in Selecting causal risk factors from high-throughput experiments using multivariable Mendelian randomization by Verena Zuber, Johanna Maria Colijn, Caroline Klaver, and Stephen Burgess.
+Documentation of the multivariable MR analysis to prioritise NMR metabolites as risk factors for age-related macular degeneration (AMD) using MR-BMA as detailed in Selecting causal risk factors from high-throughput experiments using multivariable Mendelian randomization by Verena Zuber, Johanna Maria Colijn, Caroline Klaver, and Stephen Burgess.
 
-Example data (amd_example Rdata) is based on publicely available summary data on: 
+
+The summary-level data on genetic association on NMR metabolites and AMD used for our study is now part of the data challenge of the MR conference 2019 in Bristol
+
+https://www.mendelianrandomization.org.uk/the-mr-data-challenge-2019/
+
+and available in the R-package MRChallenge2019
+
+https://github.com/WSpiller/MRChallenge2019
+
+
+
+We thank the authors and contributors of the following studies for publishing genome-wide summary data:
 
 AMD
 ---
@@ -21,13 +33,13 @@ Kettunen, J., Demirkan, A., Wuertz, P., Draisma, H. H. M., Haller, T., Rawal, R.
 Compilation:
 -------------
 
-1. all genetic instrumental variables included:
+1. all genetic instrumental variables included (n=148):
 
 knit("run-BMA-AMD-n148.Rmd")
 
 markdownToHTML('run-BMA-AMD-n148.md', 'run-BMA-AMD-n148.html', options=c("use_xhml"))
 
-2. after excluding outliers and influential points:
+2. after excluding outliers and influential points (n=145):
 
 knit("run-BMA-AMD-n145.Rmd")
 
@@ -39,6 +51,8 @@ markdownToHTML('run-BMA-AMD-n145.md', 'run-BMA-AMD-n145.html', options=c("use_xh
 
 Package dependencies:
 ---------------------
+
+require(MRChallenge2019)
 
 require(knitr)
 
