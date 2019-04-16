@@ -1,5 +1,5 @@
 #
-# 12th April 2018
+# 15th April 2019
 # risk factor selection for multivariable MR based on Bayes Factors
 # computation is based on summary data which speeds up computation 
 #
@@ -9,6 +9,12 @@
 # create_environment: 		create new environment to search
 # log_binom_gamma:		prior for model size
 #
+
+# Class
+# mvMRInput:			input format for summarymvMR_SSS
+# MR_SSS:			output format of summarymvMR_SSS
+
+
 # now synced with manuscript and BF derivation
 # input: object of class mvMRInput
 # NOTE hash:: prevents clashes wit MendelianRandomization R package
@@ -16,6 +22,36 @@
 
 library(combinat)
 library(hash)
+
+
+
+
+
+
+
+#
+# class mv-mr input
+#
+
+setClass("mvMRInput",
+         representation(betaX = "matrix",
+                        betaY = "matrix",
+                        betaXse = "matrix",
+                        betaYse = "matrix",
+                        exposure = "character",
+                        outcome = "character",
+                        snps = "character",
+                        effect_allele = "character",
+                        other_allele  = "character",
+                        eaf           = "numeric",                        
+			correlation = "matrix")
+)
+
+
+
+
+
+
 
 
 #
@@ -73,6 +109,11 @@ summarymvMR_SSS = function(object, kmin=1, kmax=20, max_iter=1000, sigma=0.5, pr
 	best_model_est = theta_all[,which.max(log_evidence)]
 	#posterior for each model
 	max_evidence = max(log_evidence) 
+	if(max_evidence>308){
+		rescale_diff = max_evidence - 308
+		log_evidence = log_evidence - (rescale_diff+1)
+		max_evidence = 308
+	}
 	sum_calib = sum(10^(log_evidence-max_evidence)) * 10^max_evidence
 	pp=10^log_evidence/sum_calib 
 	pp_mat=matrix(pp, ncol=length(pp), nrow=ncol(bX), byrow=TRUE)
@@ -161,8 +202,16 @@ summary_stochastic_search = function(y,x,sigma_vec, prior_prob=0.5, kmin=1, kmax
 		while (iter< max_iter){
 			#print(paste("sss run: ", iter))
 			#draw a random configuration with weights according to BF from the last set of tupel 
-			evidence = 10^(unlist(configlogBF) + unlist(configlogprior))
-			random_nr=sample(1:length(evidence), size=1, prob = evidence/sum(evidence))
+			log_evidence = unlist(configlogBF) + unlist(configlogprior)
+			max_evidence = max(log_evidence) 
+			if(max_evidence>308){
+				rescale_diff = max_evidence - 308
+				log_evidence = log_evidence - (rescale_diff+1)
+				max_evidence = 308
+			}
+			sum_calib = sum(10^(log_evidence-max_evidence)) * 10^max_evidence
+			evidence = 10^(log_evidence)
+			random_nr=sample(1:length(evidence), size=1, prob = evidence/sum_calib)
 			random_config=new_neighbourhood[[random_nr]]
 			if(print==TRUE){print(random_config)}
 			#create new neighbourhood
@@ -329,6 +378,104 @@ log_binom_gamma = function(gamma, n_x, prior_prob){
 return(log_prior)
 
 }
+
+
+
+
+
+
+
+#
+# make table: report the best individual models
+#
+
+
+#input
+#BMA_output object of class mvMR_SSS
+#prior_sigma needs to be specified as in main function
+#top = 10 how many top models to be reported?
+#write.out = FALSE write out table as csv file
+#csv.file.name = "best_model_out"
+
+
+
+sss.report.best.model = function(BMA_output, prior_sigma=0.5, top = 10, digits = 3, write.out = TRUE, csv.file.name="best_model_out"){
+
+
+	if(class(BMA_output)[1] !="mvMR_SSS"){
+		message("Input needs to be of class mvMR_SSS")
+		break
+		}
+
+	pp=BMA_output@pp
+	models=BMA_output@tupel
+	sort_pp_model_object=sort.int(pp, index.return=TRUE, decreasing=TRUE)
+	grep_rf=models[sort_pp_model_object$ix][1:top]
+
+	rf_top = list()
+	tupel_top = list()
+	for(i in 1:top){
+		tupel_top[[i]] =as.numeric(unlist(strsplit(grep_rf[i], ",")))
+		rf_top[i]=paste(rf[as.numeric(unlist(strsplit(grep_rf[i], ",")))],  collapse=",")
+	}
+
+	theta_top = list()
+	Theta=lapply(tupel_top, FUN = beta_gamma, y=as.matrix(amd_beta_ivw),x=as.matrix(betaX_ivw), sigma_vec=rep(0.5, ncol(as.matrix(betaX_ivw))))
+
+	for(i in 1:top){
+		Theta_iter = Theta[[i]]
+		Theta_iter[Theta_iter!=0]
+		theta_top[[i]]= paste(round(Theta_iter[Theta_iter!=0],digits=digits),  collapse=",")
+	}
+
+	best_models_out=cbind(rf_top, round(pp[sort_pp_model_object$ix][1:top],digits=digits), theta_top)
+	colnames(best_models_out) = c("rf combination", "posterior probability", "causal estimate")
+
+
+	if(write.out == TRUE){write.csv(best_models_out, file=csv.file.name)}
+
+	return(best_models_out)
+
+}
+
+
+
+
+
+#
+# make table: report the model-averaged results (MR-BMA)
+#
+
+
+#input
+#BMA_output object of class mvMR_SSS
+#top = 10 how many top models to be reported?
+#write.out = FALSE write out table as csv file
+#csv.file.name = "mr_bma_out"
+
+
+
+sss.report.mr.bma = function(BMA_output,  top = 10, digits = 3, write.out = TRUE, csv.file.name="mr_bma_out"){
+
+	if(class(BMA_output)[1] !="mvMR_SSS"){
+		message("Input needs to be of class mvMR_SSS")
+		break
+		}
+
+	pp_marginal = BMA_output@pp_marginal
+	bma=BMA_output@BMAve_Estimate
+	sort_pp_object=sort.int(pp_marginal, index.return=TRUE, decreasing=TRUE)
+	marginal_out=cbind(rf[sort_pp_object$ix][1:top], round(pp_marginal[sort_pp_object$ix][1:top],digits=digits), round(bma[sort_pp_object$ix][1:top],digits=digits) )
+	colnames(marginal_out)=c("rf", "marginal inclusion", "average effect")
+
+	if(write.out == TRUE){write.csv(marginal_out, file=csv.file.name)}
+
+	return(marginal_out)
+
+}
+
+
+
 
 
 

@@ -1,5 +1,5 @@
 #
-# 12th April 2018
+# 15th April 2019
 # risk factor selection for multivariable MR based on Bayes Factors
 # computation is based on summary data which speeds up computation 
 #
@@ -10,19 +10,76 @@
 # cooksD: 		Cooks distance
 # beta_est, beta_gamma: compute causal estimate on data matrix
 # logBF, logBF_gamma:	compute log10 Bayes factor for indicator on data matrix 
-
-# now synced with manuscript and BF derivation
-# input: object of class mvMRInput
 #
+
+# Class
+# mvMRInput:		input format for summary_mvMR_BF
+# MRBF:			output format of summary_mvMR_BF
+
+
 
 library(combinat)
 
 
+
+
+
+#
+# class mv-mr input
+#
+
+setClass("mvMRInput",
+         representation(betaX = "matrix",
+                        betaY = "matrix",
+                        betaXse = "matrix",
+                        betaYse = "matrix",
+                        exposure = "character",
+                        outcome = "character",
+                        snps = "character",
+                        effect_allele = "character",
+                        other_allele  = "character",
+                        eaf           = "numeric",                        
+			correlation = "matrix")
+)
+
+
+
+
+#
+# class MRBF for output
+#
+
+
+
+
+setClass("MRBF",
+         representation(Exposure = "character",
+                        Outcome = "character",
+                        BMAve_Estimate = "numeric",
+			BestModel_Estimate = "numeric",
+			BestModel = "character",
+			tupel = "character",
+			pp="numeric",
+			pp_marginal="numeric" )
+)
+
+
+
+
+
+
+
+
+
+#
+# summary_mvMR_BF
+#
+
 summary_mvMR_BF = function(object, sigma=0.5, prior_prob=0.5){
 
 
-	bX = object@betaX
-	bY = object@betaY
+	#bX = object@betaX
+	#bY = object@betaY
 	n_SNPs = nrow(bX)
 	n_RF = ncol(bX)
 	XtX = t(bX) %*% bX		# dim  d=10  x d=10	 	
@@ -35,7 +92,8 @@ summary_mvMR_BF = function(object, sigma=0.5, prior_prob=0.5){
 	theta_all = matrix(numeric(0), (ncol(bX)),0)
 	sigma_vec=rep(sigma, ncol(bX))
 
-	for (i in 1:ncol(bX)){
+	#for (i in 1:ncol(bX)){
+	for (i in 1:5){
 
 		combi=matrix(combn(1:ncol(bX), i),nrow=i)
 		tupel=apply(combi, 2, paste, collapse=",") 
@@ -56,6 +114,11 @@ summary_mvMR_BF = function(object, sigma=0.5, prior_prob=0.5){
 	best_model_est = theta_all[,which.max(log_evidence)]
 	#posterior for each model
 	max_evidence = max(log_evidence) 
+	if(max_evidence>308){
+		rescale_diff = max_evidence - 308
+		log_evidence = log_evidence - rescale_diff
+		max_evidence = 308
+	}
 	sum_calib = sum(10^(log_evidence-max_evidence)) * 10^max_evidence
 	pp=10^log_evidence/sum_calib 
 	pp_mat=matrix(pp, ncol=length(pp), nrow=ncol(bX), byrow=TRUE)
@@ -88,16 +151,6 @@ summary_mvMR_BF = function(object, sigma=0.5, prior_prob=0.5){
 
 
 
-setClass("MRBF",
-         representation(Exposure = "character",
-                        Outcome = "character",
-                        BMAve_Estimate = "numeric",
-			BestModel_Estimate = "numeric",
-			BestModel = "character",
-			tupel = "character",
-			pp="numeric",
-			pp_marginal="numeric" )
-)
 
 
 
@@ -108,14 +161,9 @@ setClass("MRBF",
 
 
 
-
-
-
-
-
-
-
+#
 # compute the logBF for a set of risk factors given gamma (indicator vector)
+#
 
 logBF_summary = function(XtY,XtX,YtY,sigma_vec, gamma, n){
 	
@@ -134,8 +182,10 @@ logBF_summary = function(XtY,XtX,YtY,sigma_vec, gamma, n){
 }
 
 
-
+#
 # compute the causal estimates for a set of risk factors given gamma (indicator vector)
+#
+
 
 beta_summary = function(XtY=XtY,XtX=XtX,sigma_vec, gamma){
 
@@ -163,6 +213,11 @@ beta_summary = function(XtY=XtY,XtX=XtX,sigma_vec, gamma){
 # Cooks distance
 #
 
+
+# input: y = betaY, x = betaX, sigma_vec = prior variance
+# output: cooksD = cooks Distance, cooksD_thresh = suggested threshold based on a F distribution with df1=d,df2=k-d
+
+
 cooksD = function(y,x,sigma_vec){
 	k=length(y)
 	d=ncol(x)
@@ -172,8 +227,8 @@ cooksD = function(y,x,sigma_vec){
 	e = y-(H_fm%*%y)
 	s_sq = c(1/(k-d) * t(e) %*% e)
 	cooksD = e^2/(s_sq * d) * (h_i/(1-h_i)^2 )
-
-	return(cooksD)
+	thresh=qf(0.5,df1=d,df2=k-d)
+	return(list(cooksD=cooksD,cooksD_thresh=thresh))
 }
 
 
@@ -259,6 +314,128 @@ beta_est = function(y,x,sigma_vec, intercept){
 	return(theta_out)
 }
 
+
+
+
+
+
+
+
+
+
+
+
+#
+# make table: report the best individual models
+#
+
+
+#input
+#BMA_output object of class MRBF
+#prior_sigma needs to be specified as in main function
+#top = 10 how many top models to be reported?
+#write.out = FALSE write out table as csv file
+#csv.file.name = "best_model_out"
+
+
+
+report.best.model = function(BMA_output, prior_sigma=0.5, top = 10, digits = 3, write.out = TRUE, csv.file.name="best_model_out"){
+
+
+	if(class(BMA_output)[1] !="MRBF"){
+		message("Input needs to be of class MRBF")
+		break
+		}
+
+	pp=BMA_output@pp
+	models=BMA_output@tupel
+	sort_pp_model_object=sort.int(pp, index.return=TRUE, decreasing=TRUE)
+	grep_rf=models[sort_pp_model_object$ix][1:top]
+
+	rf_top = list()
+	tupel_top = list()
+	for(i in 1:top){
+		tupel_top[[i]] =as.numeric(unlist(strsplit(grep_rf[i], ",")))
+		rf_top[i]=paste(rf[as.numeric(unlist(strsplit(grep_rf[i], ",")))],  collapse=",")
+	}
+
+	theta_top = list()
+	Theta=lapply(tupel_top, FUN = beta_gamma, y=as.matrix(amd_beta_ivw),x=as.matrix(betaX_ivw), sigma_vec=rep(0.5, ncol(as.matrix(betaX_ivw))))
+
+	for(i in 1:top){
+		Theta_iter = Theta[[i]]
+		Theta_iter[Theta_iter!=0]
+		theta_top[[i]]= paste(round(Theta_iter[Theta_iter!=0],digits=digits),  collapse=",")
+	}
+
+	best_models_out=cbind(rf_top, round(pp[sort_pp_model_object$ix][1:top],digits=digits), theta_top)
+	colnames(best_models_out) = c("rf combination", "posterior probability", "causal estimate")
+
+
+	if(write.out == TRUE){write.csv(best_models_out, file=csv.file.name)}
+
+	return(best_models_out)
+
+}
+
+
+
+
+
+#
+# make table: report the model-averaged results (MR-BMA)
+#
+
+
+#input
+#BMA_output object of class MRBF
+#top = 10 how many top models to be reported?
+#write.out = FALSE write out table as csv file
+#csv.file.name = "mr_bma_out"
+
+
+
+report.mr.bma = function(BMA_output,  top = 10, digits = 3, write.out = TRUE, csv.file.name="mr_bma_out"){
+
+	if(class(BMA_output)[1] !="MRBF"){
+		message("Input needs to be of class MRBF")
+		break
+		}
+
+	pp_marginal = BMA_output@pp_marginal
+	bma=BMA_output@BMAve_Estimate
+	sort_pp_object=sort.int(pp_marginal, index.return=TRUE, decreasing=TRUE)
+	marginal_out=cbind(rf[sort_pp_object$ix][1:top], round(pp_marginal[sort_pp_object$ix][1:top],digits=digits), round(bma[sort_pp_object$ix][1:top],digits=digits) )
+	colnames(marginal_out)=c("rf", "marginal inclusion", "average effect")
+
+	if(write.out == TRUE){write.csv(marginal_out, file=csv.file.name)}
+
+	return(marginal_out)
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+helper = function(x){
+  as.numeric(x[, drop =  F])
+}
 
 
 
