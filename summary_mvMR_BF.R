@@ -60,7 +60,9 @@ setClass("MRBF",
 			BestModel = "character",
 			tupel = "character",
 			pp="numeric",
-			pp_marginal="numeric" )
+			pp_marginal="numeric",
+			betaX="matrix",
+			betaY="matrix")
 )
 
 
@@ -141,7 +143,9 @@ summary_mvMR_BF = function(object, sigma=0.5, prior_prob=0.5){
 		BestModel = best_model,
 		tupel = tupel_all,
 		pp=pp,
-		pp_marginal = pp_marginal
+		pp_marginal = pp_marginal,
+		betaX = bX,
+		betaY= bY
 
 	))
 
@@ -349,6 +353,8 @@ report.best.model = function(BMA_output, prior_sigma=0.5, top = 10, digits = 3, 
 
 	pp=BMA_output@pp
 	models=BMA_output@tupel
+	betaX=BMA_output@betaX
+	betaY=BMA_output@betaY	
 	sort_pp_model_object=sort.int(pp, index.return=TRUE, decreasing=TRUE)
 	grep_rf=models[sort_pp_model_object$ix][1:top]
 
@@ -360,7 +366,7 @@ report.best.model = function(BMA_output, prior_sigma=0.5, top = 10, digits = 3, 
 	}
 
 	theta_top = list()
-	Theta=lapply(tupel_top, FUN = beta_gamma, y=as.matrix(amd_beta_ivw),x=as.matrix(betaX_ivw), sigma_vec=rep(0.5, ncol(as.matrix(betaX_ivw))))
+	Theta=lapply(tupel_top, FUN = beta_gamma, y=as.matrix(betaY),x=as.matrix(betaX), sigma_vec=rep(0.5, ncol(as.matrix(betaX_ivw))))
 
 	for(i in 1:top){
 		Theta_iter = Theta[[i]]
