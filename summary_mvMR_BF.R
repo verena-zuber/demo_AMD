@@ -366,7 +366,7 @@ report.best.model = function(BMA_output, prior_sigma=0.5, top = 10, digits = 3, 
 	}
 
 	theta_top = list()
-	Theta=lapply(tupel_top, FUN = beta_gamma, y=as.matrix(betaY),x=as.matrix(betaX), sigma_vec=rep(0.5, ncol(as.matrix(betaX_ivw))))
+	Theta=lapply(tupel_top, FUN = beta_gamma, y=as.matrix(betaY),x=as.matrix(betaX), sigma_vec=rep(0.5, ncol(as.matrix(betaX))))
 
 	for(i in 1:top){
 		Theta_iter = Theta[[i]]
