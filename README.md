@@ -31,21 +31,33 @@ Kettunen, J., Demirkan, A., Wuertz, P., Draisma, H. H. M., Haller, T., Rawal, R.
 
 
 
-Compilation:
--------------
+Installation and R version:
+---------------------------
 
-1. all genetic instrumental variables included (n=148):
+Developed under: R version 3.4.2 (2017-09-28) -- "Short Summer"
+Tested under: R version 3.6.1 (2019-07-05) -- "Action of the Toes"
+
+source("summary_mvMR_SSS.R")
+source("summary_mvMR_BF.R")
+
+Installation time: < 1 sec
+
+
+
+Compilation and replication of the application example:
+------------------------------------------------------
+
+1. all genetic instrumental variables included (n=148, runtime: 14 minutes):
 
 knit("run-BMA-AMD-n148.Rmd")
 
 markdownToHTML('run-BMA-AMD-n148.md', 'run-BMA-AMD-n148.html', options=c("use_xhml"))
 
-2. after excluding outliers and influential points (n=145):
+2. after excluding outliers and influential points (n=145, runtime: 11 minutes):
 
 knit("run-BMA-AMD-n145.Rmd")
 
 markdownToHTML('run-BMA-AMD-n145.md', 'run-BMA-AMD-n145.html', options=c("use_xhml"))
-
 
 
 
@@ -66,3 +78,11 @@ require(combinat)
 require(hash)
 
 require(corpcor)
+
+
+
+Licence:
+---------
+
+The MIT Licence
+https://opensource.org/licenses/MIT
