@@ -14,6 +14,10 @@ and available in the R-package MRChallenge2019
 https://github.com/WSpiller/MRChallenge2019
 
 
+Alternatively, use:
+
+load("amd_example")
+
 
 We thank the authors and contributors of the following studies for publishing genome-wide summary data:
 
