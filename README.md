@@ -1,6 +1,6 @@
 # Selecting causal risk factors from high-throughput experiments using multivariable Mendelian randomization
 
-(20th of July 2018, updated 16th of April 2019)
+(20th of July 2018, updated 23rd of September 2019)
 
 Documentation of the multivariable MR analysis to prioritise NMR metabolites as risk factors for age-related macular degeneration (AMD) using MR-BMA as detailed in Selecting causal risk factors from high-throughput experiments using multivariable Mendelian randomization by Verena Zuber, Johanna Maria Colijn, Caroline Klaver, and Stephen Burgess.
 
@@ -31,16 +31,25 @@ Kettunen, J., Demirkan, A., Wuertz, P., Draisma, H. H. M., Haller, T., Rawal, R.
 
 
 
-Installation and R version:
----------------------------
+R version:
+----------
 
 Developed under: R version 3.4.2 (2017-09-28) -- "Short Summer"
+
 Tested under: R version 3.6.1 (2019-07-05) -- "Action of the Toes"
 
+
+
+Installation:
+-------------
+
 source("summary_mvMR_SSS.R")
+
 source("summary_mvMR_BF.R")
 
 Installation time: < 1 sec
+
+
 
 
 
