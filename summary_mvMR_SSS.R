@@ -472,6 +472,7 @@ sss.report.mr.bma = function(BMA_output,  top = 10, digits = 3, write.out = TRUE
 
 	pp_marginal = BMA_output@pp_marginal
 	bma=BMA_output@BMAve_Estimate
+	rf=BMA_output@Exposure	
 	sort_pp_object=sort.int(pp_marginal, index.return=TRUE, decreasing=TRUE)
 	marginal_out=cbind(rf[sort_pp_object$ix][1:top], round(pp_marginal[sort_pp_object$ix][1:top],digits=digits), round(bma[sort_pp_object$ix][1:top],digits=digits) )
 	colnames(marginal_out)=c("rf", "marginal inclusion", "average effect")
