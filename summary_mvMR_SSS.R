@@ -414,7 +414,8 @@ sss.report.best.model = function(BMA_output, prior_sigma=0.5, top = 10, digits =
 	pp=BMA_output@pp
 	models=BMA_output@tupel
 	betaX=BMA_output@betaX
-	betaY=BMA_output@betaY	
+	betaY=BMA_output@betaY
+	rf=BMA_output@Exposure
 	sort_pp_model_object=sort.int(pp, index.return=TRUE, decreasing=TRUE)
 	grep_rf=models[sort_pp_model_object$ix][1:top]
 
