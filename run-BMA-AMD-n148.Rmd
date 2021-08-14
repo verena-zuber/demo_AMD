@@ -1,7 +1,7 @@
 ---
 title: "Multivariable Mendelian randomization: NMR metabolites as risk factors for age-related macular degeneration (AMD)"
 author: "Verena Zuber"
-date: "16/4/2019"
+date: "14/8/2021"
 output: html_document
 ---
 
@@ -21,7 +21,6 @@ knitr::opts_chunk$set(fig.path='figures_bma148/')
 First we load the relevant packages and functions.
 ```{r echo = FALSE, message=FALSE, warning=FALSE}
 library(ggplot2)
-library(MRChallenge2019)
 source("summary_mvMR_SSS.R")
 source("summary_mvMR_BF.R")
 ```
@@ -30,57 +29,17 @@ source("summary_mvMR_BF.R")
 ## 1. Loading the data (n=148 instrumental variables) and pre-processing
 
 
-There are two missing values in the AMD data, let's remove them, which reduces the sample size to n=148.
+All relevant input data is provided in the Rdata "amd_example".
 ```{r message=FALSE, warning=FALSE}
-remove.na=which(is.na(Challenge_dat$beta_amd)==TRUE)
-Challenge_dat.na_rm = Challenge_dat[-remove.na,]
-```
-
-The outcome of interest is AMD, the respective summary-level data on genetic association with AMD (from Fritsch et al http://amdgenetics.org/) and its respective standard error is stored in the vectors beta_amd and se_amd. 
-```{r message=FALSE, warning=FALSE}
-colnames(Challenge_dat)
-amd_beta =  Challenge_dat.na_rm$beta_amd
-amd_se =  Challenge_dat.na_rm$se_amd
-hist(amd_beta)
-```
-
-As risk factors we consider NMR metabolites, of which we use summary-level data for genetic associations from a large meta-analysis as described in Kettunen et al
-http://computationalmedicine.fi/data#NMR_GWAS . We work with the genetic associations saved in bmat_in and their respective p-values.
-```{r message=FALSE, warning=FALSE}
-bmat_in = Challenge_dat.na_rm[,32:149]
-pmat_in = Challenge_dat.na_rm[,150:267]
-```
-
-
-One of the biggest challenges of multivariable MR is the design of a meaningful study, in particular the choice of both the genetic variants and the risk factors. 
-A risk factor can be included into the analysis if the following criteria (RF1-RF2) hold:
-
--RF1 Relevance: The risk factor needs to be strongly instrumented by at least one genetic variant included as instrumental variable.
--RF2 No multi-collinearity: The genetic associations of any risk factor included cannot be linearly explained by the genetic associations of any other risk factor or by the combinations of genetic associations of multiple other risk factors included in the analysis.
-
-
-
-In order to avoid multi-collinearity (RF2), we have pre-select and include only lipoprotein measurements on total cholesterol content, triglyceride content, and particle diameter. For the various fatty acid measurements we only included total fatty acids.
-```{r message=FALSE, warning=FALSE}
-index = c(1,2 ,3,4,5,6,11,12,15,21,22,23,24,26,27,28,29,34,35,36,47,53,55,56,57,58,59,70,76,79,80,83,84,87,92,93,94,95,96,97,98,99,100,101,102,108,111,115,118)
-bmat_in2 = bmat_in[,index]
-pmat_in2 = pmat_in[,index]
-```
-
-Additionally we need to make sure to include only risk factor needs to be strongly instrumented by at least one genetic variant included as instrumental variable (RF1). In the manuscript we suggest to include only risk factors that have at least one genome-wide significant instrument. This reduces the risk factor set to d=30 potential risk factors we include into the analysis.
-```{r message=FALSE, warning=FALSE}
-minp=apply(pmat_in2, MARGIN=2, FUN=min)
-which(minp>5e-8)
-betaX=bmat_in2[,which(minp<5e-8)]
+load("amd_example")
+betaX = amd_example$betaX
+amd_beta = amd_example$amd_beta
+amd_se = amd_example$amd_se
+rs = amd_example$annotate[,1]
+genes = amd_example$annotate[,7]
 dim(betaX)
 colnames(betaX)
 rf = colnames(betaX)
-```
-
-We further save the rs identifier and the annotated gene by VEP by ENSEMBL https://www.ensembl.org/info/docs/tools/vep/index.html.
-```{r message=FALSE, warning=FALSE}
-rs = Challenge_dat.na_rm$rsid
-genes = Challenge_dat.na_rm$predicted_gene
 ```
 
 Next, we perform an inverse variance weighting (IVW) based on the standard error of the amd beta effect estimates prior to subsequent analysis.

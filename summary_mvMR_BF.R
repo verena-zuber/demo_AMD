@@ -428,6 +428,93 @@ report.mr.bma = function(BMA_output,  top = 10, digits = 3, write.out = TRUE, cs
 
 
 
+#
+# permutation procedure to compute empirical p-values
+# 1. create permutations
+#
+
+#input
+#BMA_output: object of class mvMR_SSS output of summarymvMR_SSS
+#nrepeat: number of permutations (ideally 100k or larger)
+
+#output
+#permute_bma: matrix of size nrepeat times number of risk facttors
+
+
+create.permutations = function(BMA_output, nrepeat = 100000, save.matrix=TRUE, file.name = "permutation_mrBMA.csv"){
+	
+	#retain the datasets
+	betaX_ivw = BMA_output@betaX
+	betaY_ivw = BMA_output@betaY
+
+	#get the parameters of MR-BMA
+	kmin = BMA_output@kmin
+	kmax = BMA_output@kmax 
+	max_iter = BMA_output@max_iter
+	sigma = BMA_output@sigma
+	prior_prob = BMA_output@prior_prob
+
+	#set up the matrix where to store the permuted marginal inclusion probabilities
+	permute_bma = matrix(0, nrow=nrepeat, ncol=ncol(betaX_ivw))
+
+	#run the permutations
+	for(i in 1:nrepeat){
+  		permute_it = sample(1:nrow(betaX_ivw))
+  		betaY_ivw_permute= betaY_ivw[permute_it]
+  		permutation_input=new("mvMRInput", betaX = as.matrix(betaX_ivw), betaY = as.matrix(betaY_ivw_permute), snps=rs, exposure=rf, outcome = "permutation")
+  		BMA_output=summarymvMR_SSS(permutation_input,kmin=kmin,kmax=kmax, max_iter, sigma=sigma, prior_prob=prior_prob)
+  		permute_bma[i,] = BMA_output@pp_marginal
+	}
+
+	if(save.matrix==TRUE)
+	{
+		save(permute_bma, file=file.name)
+	}
+
+	return(permute_bma)
+
+}
+
+
+
+
+#
+# permutation procedure to compute empirical p-values
+# 2. calculatte p-value
+#
+
+#input
+#BMA_output: object of class mvMR_SSS output of summarymvMR_SSS
+#permute_bma: matrix of size nrepeat times number of risk facttors which contains the permuted marginal inclusion probabilities
+
+#output
+#res_out: table with row names equal to the risk factors, marginal inclusion probabilities, empirical p-values and Benjamini-Hochberg false discovery rates adjusting for multiple testing 
+
+
+calculate.p = function(BMA_output, permute_bma){
+	
+	#save the observed marginal inclusion probabilities and names of risk factors
+	mip_observed = BMA_output@pp_marginal
+	rf = colnames(BMA_output@betaX)
+
+	#calculate the p-value
+	p_val = rep(1,length(mip_observed))
+	for(i in 1:length(mip_observed)){
+		p_val[i]=(sum(permute_bma[,i]>mip_observed[i])+1)/(length(permute_bma[,i])+1)
+	}
+
+	p_adjust=p.adjust(p_val, "BH")
+	res_out = cbind(mip_observed,p_val,p_adjust)
+	row.names(res_out) = rf
+	colnames(res_out) = c("mip", "pval", "fdr")
+	return(res_out)
+
+}
+
+
+
+
+
 
 
 
