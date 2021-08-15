@@ -9,6 +9,7 @@ MR-BMA is a Bayesian algorithm to perform risk factor selection in multivariable
 The main function to run MR-BMA [Zuber et al (2020)] is summarymvMR_SSS() which needs an mvMRInput object:
 
 amd_nmr_input=new("mvMRInput", betaX = as.matrix(betaX_ivw), betaY = as.matrix(amd_beta_ivw), snps=rs, exposure=rf, outcome = "amd")
+
 BMA_output=summarymvMR_SSS(amd_nmr_input,kmin=1,kmax=12, prior_prob=0.1, max_iter=100)
 
 Please take care: It is necessary to adjust the following parameters according to your data and how you want to run the search algorithm (exhaustive search of models (all combinations of risk factors) or stochastic search):
@@ -18,17 +19,20 @@ Please take care: It is necessary to adjust the following parameters according t
 - prior_prob: Please adjust according to prior knowledge. the smaller the prior_prob, the sparser the models.
 - max_iter: Number of stochastic search runs. If stochastic search is used, it is recommended to set initially to a small number to make sure the algorithm is running (eg 100 as specified here). NOTE: for the final output we recommend at least 10k, ideally 100k runs.
 
-The output of the MR-BMA function is complex and includes all combination of risk factors visited. Additionally, this packages includes functions for the best model (combination of risk factors) and the model-averaged results to summarize the output and create output tables which can be saved as text files:
+The output of the MR-BMA function is complex and includes all combination of risk factors visited. Additionally, this packages includes two functions to summarize the output and create output tables which can be saved as text files, one for the best model (combination of risk factors) and one for the model-averaged results :
 
 best.model.out = sss.report.best.model(BMA_output, top = 10, write.out = TRUE, csv.file.name="amd_best_10models_n145")
+
 best.model.out
 
 mr.bma.out = sss.report.mr.bma(BMA_output, top = 10, write.out = TRUE, csv.file.name="amd_mr_bma_n145")
+
 mr.bma.out
 
-Finally, we have proposed a permutation procedure [Levin et al (2021)] to calculate empirical p-values which is a computationally very intensive (may be hours of runtime). Please make sure to run first with few runs (nrepeat = 10) and evaluate the run time. Consider running this command on a remote server and saving the permutation p-values. NOTE: For stable results we recommend nrepeat = 100000:
+Finally, we have proposed a permutation procedure [Levin et al (2021)] to calculate empirical p-values which is a computationally very intensive (may be hours of runtime). Please make sure to run first with few runs (nrepeat = 10 or 100) and evaluate the run time. Consider running this command on a remote server and saving the permutation p-values as provided by the function create.permutations(). NOTE: For stable results we recommend nrepeat = 100000:
 
 permute_bma = create.permutations(BMA_output, nrepeat = 100, save.matrix=TRUE, file.name = "permutation_mrBMA.csv")
+
 empirical.p = calculate.p(BMA_output, permute_bma)
 
 
@@ -68,8 +72,10 @@ Levin, M. G. et al. Prioritizing the role of major lipoproteins and subfractions
 
 
 
-
+Data availability:
+------------------
 We thank the authors and contributors of the following studies for publishing genome-wide summary data:
+
 
 AMD
 ---
