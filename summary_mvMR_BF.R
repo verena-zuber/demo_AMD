@@ -94,8 +94,8 @@ summary_mvMR_BF = function(object, sigma=0.5, prior_prob=0.5){
 	theta_all = matrix(numeric(0), (ncol(bX)),0)
 	sigma_vec=rep(sigma, ncol(bX))
 
-	#for (i in 1:ncol(bX)){
-	for (i in 1:5){
+	for (i in 1:ncol(bX)){
+	#for (i in 1:5){
 
 		combi=matrix(combn(1:ncol(bX), i),nrow=i)
 		tupel=apply(combi, 2, paste, collapse=",") 
@@ -453,6 +453,8 @@ create.permutations = function(BMA_output, nrepeat = 100000, save.matrix=TRUE, f
 	max_iter = BMA_output@max_iter
 	sigma = BMA_output@sigma
 	prior_prob = BMA_output@prior_prob
+	rf = BMA_output@Exposure
+	rs = as.character(1:nrow(BMA_output@betaX))
 
 	#set up the matrix where to store the permuted marginal inclusion probabilities
 	permute_bma = matrix(0, nrow=nrepeat, ncol=ncol(betaX_ivw))
