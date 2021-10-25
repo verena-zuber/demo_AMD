@@ -503,12 +503,15 @@ sss.report.mr.bma = function(BMA_output,  top = 10, digits = 3, write.out = TRUE
 #input
 #BMA_output: object of class mvMR_SSS output of summarymvMR_SSS
 #nrepeat: number of permutations (ideally 100k or larger)
+#save.matrix = True saves the permuted prior probabilities for each repetition as Rdata file with file.names as specified
+
 
 #output
 #permute_bma: matrix of size nrepeat times number of risk facttors
 
 
-create.permutations = function(BMA_output, nrepeat = 100000, save.matrix=TRUE, file.name = "permutation_mrBMA.csv"){
+
+create.permutations = function(BMA_output, nrepeat = 100000, save.matrix=TRUE, file.name = "permutation_mrBMA"){
 	
 	#retain the datasets
 	betaX_ivw = BMA_output@betaX

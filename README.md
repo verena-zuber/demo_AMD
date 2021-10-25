@@ -29,9 +29,10 @@ mr.bma.out = sss.report.mr.bma(BMA_output, top = 10, write.out = TRUE, csv.file.
 
 mr.bma.out
 
-Finally, we have proposed a permutation procedure [Levin et al (2021)] to calculate empirical p-values which is a computationally very intensive (may be hours of runtime). Please make sure to run first with few runs (nrepeat = 10 or 100) and evaluate the run time. Consider running this command on a remote server and saving the permutation p-values as provided by the function create.permutations(). NOTE: For stable results we recommend nrepeat = 100000:
+Finally, we have proposed a permutation procedure [Levin et al (2021)] to calculate empirical p-values which is a computationally very intensive (may be hours of runtime). Please make sure to run first with few runs (nrepeat = 10 or 100) and evaluate the run time. Consider running this command on a remote server and saving the permutation p-values as provided by the function create.permutations(), if save.matrix=TRUE the permuted posterior probabilities are saved for all repetitions. The function calculate.p calculates the actual p-values, here they are saved in the object empirical.p. 
+NOTE: For stable results we recommend nrepeat = 100000.
 
-permute_bma = create.permutations(BMA_output, nrepeat = 100, save.matrix=TRUE, file.name = "permutation_mrBMA.csv")
+permute_bma = create.permutations(BMA_output, nrepeat = 100, save.matrix=TRUE, file.name = "permutation_mrBMA")
 
 empirical.p = calculate.p(BMA_output, permute_bma)
 
