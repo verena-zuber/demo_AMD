@@ -1,0 +1,233 @@
+---
+title: "Multivariable Mendelian randomization: NMR metabolites as risk factors for age-related macular degeneration (AMD)"
+author: "Verena Zuber"
+date: "02/05/2025"
+output: pdf_document
+highlight: tango
+---
+
+
+
+
+## Multivariable Mendelian randomization: NMR metabolites as risk factors for age-related macular degeneration (AMD)
+## MR-BMA
+
+```{r setup, include=FALSE}
+#options for RMD
+options(width = 120)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.path='figures_bma148/')
+```
+
+First we load the relevant packages and functions.
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+source("summary_mvMR_SSS.R")
+source("summary_mvMR_BF.R")
+```
+
+
+## 1. Loading the data (n=148 instrumental variables) and pre-processing
+
+
+All relevant input data is provided in the Rdata "amd_example".
+```{r message=FALSE, warning=FALSE}
+load("amd_example")
+betaX = amd_example$betaX
+amd_beta = amd_example$amd_beta
+amd_se = amd_example$amd_se
+rs = amd_example$annotate[,1]
+genes = amd_example$annotate[,7]
+dim(betaX)
+colnames(betaX)
+rf = colnames(betaX)
+```
+
+Next, we perform an inverse variance weighting (IVW) based on the standard error of the amd beta effect estimates prior to subsequent analysis.
+```{r message=FALSE, warning=FALSE}
+betaX_ivw = betaX / amd_se
+amd_beta_ivw = amd_beta / amd_se
+```
+
+
+
+## 2. Analysis: Univariable MR
+
+Univariate MR for each metabolite, ranked by minimum p-value.
+```{r message=FALSE, warning=FALSE}
+beta_coeff = rep(0, ncol(betaX_ivw)) 
+p_val = rep(0, ncol(betaX_ivw)) 
+for(i in 1:ncol(betaX_ivw)){
+	lm_out = lm(amd_beta_ivw ~ betaX_ivw[,i]-1)
+	beta_coeff[i] =summary(lm_out)$coeff[1]
+	p_adjust =summary(lm_out)$coeff[4]*49
+	if(p_adjust>1){p_val[i] = 1}
+	else{p_val[i] = p_adjust}
+} 
+mat_out = cbind(colnames(betaX_ivw),beta_coeff, p_val) 
+sort_p=sort(p_val, index.return=TRUE, decreasing = FALSE)
+colnames(mat_out) = c("rf","beta with AMD","p")
+mat_out[sort_p$ix,]
+```
+
+
+
+## 3. Analysis: Bayesian model selection with stochastic search
+
+
+
+We create an object of class mvMRInput and we run MR-BMA allowing for models with up to 12 risk factors and a prior probability of 0.1 reflecting an a priori model size of three risk factors.
+```{r message=FALSE, warning=FALSE}
+set.seed(12345)
+amd_nmr_input=new("mvMRInput", betaX = as.matrix(betaX_ivw), betaY = as.matrix(amd_beta_ivw), snps=rs, exposure=rf, outcome = "amd")
+BMA_output=summarymvMR_SSS(amd_nmr_input,kmin=1,kmax=12, prior_prob=0.1, max_iter=100000)
+```
+
+The best model with the highest posterior evidence:
+```{r message=FALSE, warning=FALSE}
+best_model_ind=as.numeric(unlist(strsplit(BMA_output@BestModel, ",")))
+rf[best_model_ind]
+BMA_output@BestModel_Estimate
+```
+
+What are the next best individual models?
+
+```{r message=FALSE, warning=FALSE}
+best.model.out = sss.report.best.model(BMA_output, prior_sigma=0.5, top = 10, write.out = TRUE, csv.file.name="amd_best_10models_n148")
+best.model.out
+```
+
+MR-BMA output: Marginal inclusion probabilities and model-averaged effect (MACE) for each risk factor (top 10)
+```{r message=FALSE, warning=FALSE}
+mr.bma.out = sss.report.mr.bma(BMA_output, top = 10, write.out = TRUE, csv.file.name="amd_mr_bma_n148")
+mr.bma.out
+```
+
+
+
+
+## 4. Model diagnostics for outliers (Cook's D) and influential points (Q) for all models with pp>0.02
+
+
+For model diagnostics we consider all individual models that had a posterior probability larger than 0.02. Modify this value (diag_ppthresh) accordingly for your study.
+  
+```{r message=FALSE, warning=FALSE}
+diag_ppthresh = 0.02
+nr_diag = length(which(best.model.out[,2] >= diag_ppthresh))
+nr_diag
+model_index = names(which(best.model.out[,2] >= diag_ppthresh))
+model_index
+```
+
+The following loop computes
+- the predicted genetic association (hat(beta_Y)) based on the model
+- Cook's distance and its threshold for each genetic variant given the model
+- the heterogeneity statistic q for each genetic variant given the model
+
+
+```{r message=FALSE, warning=FALSE}
+#initialise
+title = rep("1", nr_diag)
+predicted_amd = matrix(ncol=nr_diag, nrow=length(amd_beta_ivw))
+cD = matrix(ncol=nr_diag, nrow=length(amd_beta_ivw))
+cD_thresh = vector(length=nr_diag)
+Q = matrix(ncol=nr_diag, nrow=length(amd_beta_ivw))
+
+# fill with loop
+for(i in 1:nr_diag){
+	print(as.numeric(unlist(strsplit(model_index[i], ","))))
+	if(length(as.numeric(unlist(strsplit(model_index[i], ","))))>1){
+		betaX_model = do.call(cbind, betaX_ivw[,as.numeric(unlist(strsplit(model_index[i], ",")))])
+	}
+	else{
+		betaX_model = as.matrix(betaX_ivw[,as.numeric(unlist(strsplit(model_index[i], ",")))])
+	}	
+	title[i] = paste(rf[as.numeric(unlist(strsplit(model_index[i], ",")))],collapse=' + ')
+	sigma_vec = rep(0.5, ncol(betaX_model))
+	cD[,i] = cooksD(amd_beta_ivw,betaX_model,sigma_vec)$cooksD
+	cD_thresh[i] = cooksD(amd_beta_ivw,betaX_model,sigma_vec)$cooksD_thresh
+	H_fm = betaX_model %*% solve(t(betaX_model) %*% betaX_model + sigma_vec^{-2} ) %*% t(betaX_model)
+	predicted_amd[,i] = H_fm %*% amd_beta_ivw
+	Q[,i] = (amd_beta_ivw-predicted_amd[,i])^2
+
+}
+```
+
+
+
+## Influential points via Cook's D
+
+
+In multivariable MR diagnostics we look at scatterplots the predicted genetic association (hat(beta_Y)) based on the model including possibly more than one risk factor (note that hat(beta_Y) = theta betaX is a linear combination of the risk factors in the model) against the actually observed genetic associations with the outcome. Influential points (computed by Cooks distance (cD)) are marked by the regions the SNPs fall in where we use the median of a F distribution as threshold (saved in cD_thresh).
+
+```{r, echo=FALSE, include = TRUE, fig.height = 10, fig.width = 11}
+for(i in 1:nr_diag){
+
+	df = data.frame(x=predicted_amd[,i], y =amd_beta_ivw, cD = cD[,i], genes = genes)
+	print(ggplot(df, aes(x, y)) +  geom_point(aes(colour = cD), size =4) + scale_colour_gradientn(colours = c("white", "orange", "red", "darkred"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Cooks D") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(cD>cD_thresh[i],as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title[i]))
+
+}
+```
+
+In numbers, here is a table of Cook's distance of the top models, sorted by maximum Cooks Distance in any of the models considered.
+```{r message=FALSE, warning=FALSE}
+maxCD=apply(cD, MARGIN=1, FUN=max)
+sort.ix = sort.int(maxCD, decreasing=TRUE, index.return=TRUE)
+cooksD_tab=cbind(rs,genes,round(cD,digits=3), round(maxCD,digits=3))
+#colnames(cooksD_tab)=c("rs","region","cooksD1","cooksD2","cooksD3","cooksD4","max cooksD")
+cooksD_tab[sort.ix$ix,][1:30,]
+```
+
+Threshold of Cook's distance  according to F-statistic with d and n-d degrees of freedom.
+```{r message=FALSE, warning=FALSE}
+cD_thresh
+for(i in 1:nr_diag){
+	print(genes[which(cD[,i] > cD_thresh[i])])
+}
+```
+
+
+
+## Outliers with Q
+
+The same diagnostic plots as above, but here the color code shows the q-statistic for each genetic variant used as instrumental variable. Outliers (computed by q>10) are marked by the regions the SNPs fall in.
+```{r, echo=FALSE, include = TRUE, fig.height = 10, fig.width = 11}
+for(i in 1:nr_diag){
+
+	df = data.frame(x=predicted_amd[,i], y =amd_beta_ivw, Q = Q[,i], genes = genes)
+	print(ggplot(df, aes(x, y)) +  geom_point(aes(colour = Q), size =4) + scale_colour_gradientn(colours = c("white", "yellow", "green", "darkgreen"), values=c(0,0.027,0.1,0.5,1))  + labs(x = "predicted beta amd", y="observed beta amd", colour="Q") + geom_hline(yintercept = 0, linetype="dotted") + geom_vline(xintercept = 0, linetype="dotted") +  geom_text(aes(label=ifelse(Q>10,as.character(genes),'')),hjust=0.5, vjust=-1, size=5) + theme(axis.text.x = element_text(size = 13), axis.text.y = element_text(size = 13), axis.title.x = element_text(size = 18), axis.title.y = element_text(size = 18), legend.text=element_text(size=16),legend.title=element_text(size=18)) + ggtitle(title[i]))
+
+}
+```
+
+In numbers, here is a table of the q-statistic of the top models, sorted by the maximum in any of the models considered.
+```{r message=FALSE, warning=FALSE}
+maxQ=apply(Q, MARGIN=1, FUN=max)
+sort.ix = sort.int(maxQ, decreasing=TRUE, index.return=TRUE)
+Q_tab=cbind(rs,genes,round(Q,digits=3), round(maxQ,digits=3))
+Q_tab[sort.ix$ix,][1:30,]
+```
+
+
+
+## Use the diagnostic function
+
+
+These results are the same as when using the diagnostic function that identifies the influential variants and outliers directly and returns the respective rs numbers.
+```{r message=FALSE, warning=FALSE}
+diagnostics_output = diagnostics(BMA_output, diag_ppthresh = 0.02)
+diagnostics_output$rmCD
+diagnostics_output$rmO
+```
+
+
+
+<!--
+require(knitr)
+require(markdown)
+require(rmarkdown)
+render("run-BMA-AMD-n148-crosscheck-diagnostics.Rmd")
+#knit("run-BMA-AMD-n148.Rmd")
+#markdownToHTML('run-BMA-AMD-n148-crosscheck-diagnostics.md', 'run-BMA-AMD-n148-crosscheck-diagnostics.html', options=c("use_xhml"))
+-->
+

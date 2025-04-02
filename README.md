@@ -16,6 +16,9 @@ Please take care: It is necessary to adjust the following parameters according t
 
 - kmin: The minimum model size considered.
 - kmax: The maximum model size considered. Please note computing all possible combinations of more than 12 risk factors may become computationally infeasible. If kmin = kmax an exhaustive search is performed, if kmin<kmax a stochastic search is performed. Stochastic search is recommended for more than 12-15 risk factors.
+
+! stochastic search may be very time consuming where realisitic and feasible we recommend the exhaustive search by settin kmin and kmax to the same value. Importantly even if there are more risk factors in the model the maximum model size may be much smaller.
+
 - prior_prob: Please adjust according to prior knowledge. the smaller the prior_prob, the sparser the models.
 - max_iter: Number of stochastic search runs. If stochastic search is used, it is recommended to set initially to a small number to make sure the algorithm is running (eg 100 as specified here). NOTE: for the final output we recommend at least 10k, ideally 100k runs.
 
@@ -28,6 +31,15 @@ best.model.out
 mr.bma.out = sss.report.mr.bma(BMA_output, top = 10, write.out = TRUE, csv.file.name="amd_mr_bma_n145")
 
 mr.bma.out
+
+
+The outout of the sss.report.mr.bma can be further analyzed for diagnostic tests to identify influential and outlying IVs and calculate empirical p-values.
+
+First, the diagnostic function detects influential genetic variants and outliers for all models with the largest posterior probabilities (larger than diag_ppthresh = 0.02). 
+
+diagnostics_output = diagnostics(BMA_output, diag_ppthresh = 0.02)
+diagnostics_output$rmCD
+diagnostics_output$rmO
 
 Finally, we have proposed a permutation procedure [Levin et al (2021)] to calculate empirical p-values which is a computationally very intensive (may be hours of runtime). Please make sure to run first with few runs (nrepeat = 10 or 100) and evaluate the run time. Consider running this command on a remote server and saving the permutation p-values as provided by the function create.permutations(), if save.matrix=TRUE the permuted posterior probabilities are saved for all repetitions. The function calculate.p calculates the actual p-values, here they are saved in the object empirical.p. 
 NOTE: For stable results we recommend nrepeat = 100000.

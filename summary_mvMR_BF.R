@@ -520,7 +520,105 @@ calculate.p = function(BMA_output, permute_bma){
 
 
 
+#
+# search for influential variants and outliers
+#
 
+
+
+diagnostics = function(BMA_output, diag_ppthresh = 0.05, top = 100, digits=3){
+
+
+	# define variables and parameters
+	diag_ppthresh = diag_ppthresh
+	top = top
+	digits=digits
+	pp=BMA_output@pp
+	models=BMA_output@tupel
+	betaX=BMA_output@betaX
+	betaY=BMA_output@betaY
+	rf=BMA_output@Exposure
+	prior_sigma=BMA_output@sigma
+	sort_pp_model_object=sort.int(pp, index.return=TRUE, decreasing=TRUE)
+	grep_rf=models[sort_pp_model_object$ix][1:top]
+
+
+	# create ranking of best models (best_models_out)
+	rf_top = list()
+	tupel_top = list()
+	for(i in 1:top){
+		tupel_top[[i]] =as.numeric(unlist(strsplit(grep_rf[i], ",")))
+		rf_top[i]=paste(rf[as.numeric(unlist(strsplit(grep_rf[i], ",")))],  collapse=",")
+	}
+
+	theta_top = list()
+	Theta=lapply(tupel_top, FUN = beta_gamma, y=as.matrix(betaY),x=as.matrix(betaX), sigma_vec=rep(0.5, ncol(as.matrix(betaX))))
+
+	for(i in 1:top){
+		Theta_iter = Theta[[i]]
+		Theta_iter[Theta_iter!=0]
+		theta_top[[i]]= paste(round(Theta_iter[Theta_iter!=0],digits=digits),  collapse=",")
+	}
+
+	best_models_out=cbind(rf_top, round(pp[sort_pp_model_object$ix][1:top],digits=digits), theta_top)
+	colnames(best_models_out) = c("rf combination", "posterior probability", "causal estimate")
+
+
+	# define which models of best_models_out should be investigated
+	nr_diag = length(which(best_models_out[,2] >= diag_ppthresh))
+	model_index = names(which(best_models_out[,2] >= diag_ppthresh))
+
+	# calculate Cook's distance and q-statistic
+	predicted_beta_y = matrix(ncol=nr_diag, nrow=length(betaY))
+	cD = matrix(ncol=nr_diag, nrow=length(betaY))
+	cD_thresh = vector(length=nr_diag)
+	Q = matrix(ncol=nr_diag, nrow=length(betaY))
+
+	for(j in 1:nr_diag){
+  		#print(as.numeric(unlist(strsplit(model_index[j], ","))))
+  	if(length(as.numeric(unlist(strsplit(model_index[j], ","))))>1){
+   	 betaX_model = as.matrix(betaX[,as.numeric(unlist(strsplit(model_index[j], ",")))])
+  		}
+  	else{
+    	betaX_model = as.matrix(betaX[,as.numeric(unlist(strsplit(model_index[j], ",")))])
+  	} 
+  	#title[i] = paste(rf[as.numeric(unlist(strsplit(model_index[j], ",")))],collapse=' + ')
+  	sigma_vec = rep(0.5, ncol(betaX_model))
+  	cD[,j] = cooksD(betaY,betaX_model,sigma_vec)$cooksD
+  	cD_thresh[j] = cooksD(betaY,betaX_model,sigma_vec)$cooksD_thresh
+  	H_fm = betaX_model %*% solve(t(betaX_model) %*% betaX_model + sigma_vec^{-2} ) %*% t(betaX_model)
+  	predicted_beta_y[,j] = H_fm %*% betaY
+  	Q[,j] = (betaY-predicted_beta_y[,j])^2
+
+	}
+
+	maxCD=apply(cD, MARGIN=1, FUN=max)
+	#sort.ix = sort.int(maxCD, decreasing=TRUE, index.return=TRUE)
+	#cooksD_tab=cbind(rs,round(cD,digits=3), round(maxCD,digits=3))
+	#colnames(cooksD_tab)=c("rs","cooksD1","cooksD2","cooksD3","cooksD4","max cooksD")
+	#cooksD_tab[sort.ix$ix,][1:30,]
+
+	rmCD = pmatch(rs[which(maxCD>cD_thresh)], rs)
+
+	p_adjust = 0.05/length(betaY)
+	q_thresh=qchisq(p_adjust, df=1, ncp = 0, lower.tail = FALSE, log.p = FALSE)
+
+	maxQ=apply(Q, MARGIN=1, FUN=max)
+	#sort.ix = sort.int(maxQ, decreasing=TRUE, index.return=TRUE)
+	#Q_tab=cbind(rs,round(Q,digits=3), round(maxQ,digits=3))
+	#Q_tab[sort.ix$ix,][1:30,]
+	#rs[which(maxQ>q_thresh)]
+	#length(rs[which(maxQ>q_thresh)])
+
+	rmO = pmatch(rs[which(maxQ>q_thresh)], rs)
+
+	rm_any = sort(unique(c(rmCD, rmO)))
+
+
+return(list(rmCD=rmCD, rmO=rmO, rm_any= rm_any))
+
+
+}
 
 
 
