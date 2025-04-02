@@ -38,7 +38,9 @@ The outout of the sss.report.mr.bma can be further analyzed for diagnostic tests
 First, the diagnostic function detects influential genetic variants and outliers for all models with the largest posterior probabilities (larger than diag_ppthresh = 0.02). 
 
 diagnostics_output = diagnostics(BMA_output, diag_ppthresh = 0.02)
+
 diagnostics_output$rmCD
+
 diagnostics_output$rmO
 
 Finally, we have proposed a permutation procedure [Levin et al (2021)] to calculate empirical p-values which is a computationally very intensive (may be hours of runtime). Please make sure to run first with few runs (nrepeat = 10 or 100) and evaluate the run time. Consider running this command on a remote server and saving the permutation p-values as provided by the function create.permutations(), if save.matrix=TRUE the permuted posterior probabilities are saved for all repetitions. The function calculate.p calculates the actual p-values, here they are saved in the object empirical.p. 
